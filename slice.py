@@ -11,72 +11,9 @@ Supports macOS / Windows / Linux
 
 import argparse
 import os
-import subprocess
 import sys
 from pathlib import Path
 
-
-# ──────────────────────────────────────────────
-# Environment check & auto-install
-# ──────────────────────────────────────────────
-
-def ensure_pip():
-    """Ensure pip is available."""
-    try:
-        import pip  # noqa: F401
-        return True
-    except ImportError:
-        print("[env] pip not found, installing...")
-        try:
-            subprocess.check_call([sys.executable, "-m", "ensurepip", "--default-pip"])
-            print("[env] pip installed.")
-            return True
-        except Exception:
-            print("[env] pip install failed. Install manually: https://pip.pypa.io/en/stable/installation/")
-            return False
-
-
-def ensure_pillow():
-    """Ensure Pillow is installed."""
-    try:
-        from PIL import Image  # noqa: F401
-        print("[env] Pillow OK")
-        return True
-    except ImportError:
-        print("[env] Pillow not found, installing...")
-        if not ensure_pip():
-            sys.exit(1)
-        try:
-            subprocess.check_call([
-                sys.executable, "-m", "pip", "install",
-                "--quiet", "--disable-pip-version-check", "Pillow"
-            ])
-            import importlib
-            importlib.invalidate_caches()
-            from PIL import Image  # noqa: F401
-            print("[env] Pillow installed.")
-            return True
-        except subprocess.CalledProcessError:
-            print("[env] Pillow install failed. Try: pip install Pillow")
-            sys.exit(1)
-        except ImportError:
-            print("[env] Pillow installed but cannot import. Restart terminal and retry.")
-            sys.exit(1)
-
-
-def check_environment():
-    """Full environment check."""
-    ver = sys.version_info
-    print(f"[env] Python {ver.major}.{ver.minor}.{ver.micro}")
-    if ver < (3, 6):
-        print("[env] Need Python 3.6 or higher.")
-        sys.exit(1)
-    ensure_pillow()
-
-
-# ──────────────────────────────────────────────
-# Slice logic
-# ──────────────────────────────────────────────
 
 def slice_image(image_path: str, max_height: int = 5000, output_dir: str = None):
     from PIL import Image
@@ -133,31 +70,14 @@ def slice_image(image_path: str, max_height: int = 5000, output_dir: str = None)
     return slices
 
 
-# ──────────────────────────────────────────────
-# Entry point
-# ──────────────────────────────────────────────
-
 def main():
     parser = argparse.ArgumentParser(
         description="Image Slicer - Split long images vertically (macOS / Windows / Linux)"
     )
     parser.add_argument("image", help="Image file path")
-    parser.add_argument(
-        "--max-height", type=int, default=5000,
-        help="Max height per slice in px (default: 5000)"
-    )
-    parser.add_argument(
-        "--output-dir", default=None,
-        help="Output directory (default: <image_dir>/slices)"
-    )
-    parser.add_argument(
-        "--skip-check", action="store_true",
-        help="Skip environment check"
-    )
+    parser.add_argument("--max-height", type=int, default=5000, help="Max height per slice (default: 5000)")
+    parser.add_argument("--output-dir", default=None, help="Output directory (default: image_dir/slices)")
     args = parser.parse_args()
-
-    if not args.skip_check:
-        check_environment()
 
     slice_image(args.image, max_height=args.max_height, output_dir=args.output_dir)
 

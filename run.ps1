@@ -1,33 +1,36 @@
 # Image Slicer - PowerShell launcher
 # Usage: .\run.ps1 <image_path> [max_height]
-# Right-click this file -> "Run with PowerShell"
-# Or in PowerShell: .\run.ps1 image.png 5000
+# Right-click -> "Run with PowerShell"
+# Or: powershell -NoExit -ExecutionPolicy Bypass -File run.ps1
 
 param(
     [string]$Image,
     [int]$MaxHeight = 5000
 )
 
-$ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 function Write-Log { param([string]$Msg) Write-Host "[*] $Msg" }
 
 # ── Find Python ──
 function Find-Python {
-    $candidates = @(
-        "python3",
-        "python",
+    $candidates = @("python3", "python")
+    foreach ($c in $candidates) {
+        try {
+            $ver = & $c --version 2>&1
+            if ($LASTEXITCODE -eq 0) { return $c }
+        } catch {}
+    }
+    # Check common install paths
+    $paths = @(
         "$env:LocalAppData\Programs\Python\Python312\python.exe",
         "$env:LocalAppData\Programs\Python\Python311\python.exe",
+        "$env:LocalAppData\Programs\Python\Python310\python.exe",
         "${env:ProgramFiles}\Python312\python.exe",
         "${env:ProgramFiles}\Python311\python.exe"
     )
-    foreach ($c in $candidates) {
-        try {
-            $null = & $c --version 2>&1
-            if ($LASTEXITCODE -eq 0 -or $?) { return $c }
-        } catch {}
+    foreach ($p in $paths) {
+        if (Test-Path $p) { return $p }
     }
     return $null
 }
@@ -39,86 +42,124 @@ function Install-Python {
     Write-Host ""
 
     # Try winget
-    if (Get-Command winget -ErrorAction SilentlyContinue) {
+    $winget = Get-Command winget -ErrorAction SilentlyContinue
+    if ($winget) {
         Write-Host "[*] Installing Python via winget..."
-        winget install --id Python.Python.3.12 --accept-package-agreements --accept-source-agreements --silent
+        $result = winget install --id Python.Python.3.12 --accept-package-agreements --accept-source-agreements --silent 2>&1
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "[*] Python installed. You may need to restart PowerShell."
+            Write-Host "[*] Python installed."
+            # Refresh PATH
+            $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
             return $true
         }
+        Write-Host "[*] winget failed, trying download..."
     }
 
     # Fallback: download
-    Write-Host "[*] Downloading Python installer..."
     $installer = "$env:TEMP\python_installer.exe"
+    Write-Host "[*] Downloading Python (may take a minute)..."
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     try {
         Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.12.9/python-3.12.9-amd64.exe" -OutFile $installer
     } catch {
-        Write-Host "[X] Download failed."
-        Show-Manual
+        Write-Host "[X] Download failed: $_"
         return $false
     }
 
-    Write-Host "[*] Running installer (this may take a minute)..."
+    if (-not (Test-Path $installer)) {
+        Write-Host "[X] Download failed."
+        return $false
+    }
+
+    Write-Host "[*] Running installer..."
     Start-Process -FilePath $installer -ArgumentList "/quiet", "InstallAllUsers=1", "PrependPath=1" -Wait -Verb RunAs
     Remove-Item $installer -ErrorAction SilentlyContinue
 
     # Refresh PATH
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+    $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
 
     return $true
 }
 
-function Show-Manual {
-    Write-Host "Please install Python manually:"
-    Write-Host "  1. Open https://python.org/downloads"
-    Write-Host "  2. Download and install Python"
-    Write-Host "  3. CHECK 'Add Python to PATH' during install"
-    Write-Host "  4. Re-run this script"
-    Write-Host ""
-    Write-Host "Or use winget:"
-    Write-Host "  winget install Python.Python.3.12"
+# ── Install Pillow ──
+function Install-Pillow {
+    param([string]$PythonExe)
+
+    Write-Host "[*] Installing Pillow..."
+
+    # Try pip first
+    $result = & $PythonExe -m pip install Pillow 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "[*] Pillow installed."
+        return $true
+    }
+
+    # Try pip with --user
+    Write-Host "[*] Retrying with --user..."
+    $result = & $PythonExe -m pip install --user Pillow 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "[*] Pillow installed."
+        return $true
+    }
+
+    Write-Host "[X] Pillow install failed."
+    Write-Host "[*] You can try manually: $PythonExe -m pip install Pillow"
+    return $false
 }
 
-# ── Main ──
+# ══════════════════════════════════════════
+#  Main
+# ══════════════════════════════════════════
+
 Write-Host "========================================"
 Write-Host "  Image Slicer"
 Write-Host "========================================"
 Write-Host ""
 
-# Find or install Python
+# 1. Find or install Python
 $python = Find-Python
 if (-not $python) {
     $ok = Install-Python
-    if (-not $ok) { Read-Host "Press Enter to exit"; exit 1 }
+    if (-not $ok) {
+        Write-Host ""
+        Write-Host "Please install Python manually:"
+        Write-Host "  https://python.org/downloads"
+        Write-Host "  CHECK 'Add Python to PATH' during install"
+        Write-Host ""
+        Read-Host "Press Enter to exit"
+        return
+    }
     $python = Find-Python
     if (-not $python) {
-        Write-Host "[X] Python still not found. Restart PowerShell and retry."
-        Read-Host "Press Enter to exit"; exit 1
+        Write-Host "[X] Python installed but not found."
+        Write-Host "[*] Restart PowerShell and retry."
+        Read-Host "Press Enter to exit"
+        return
     }
 }
 
 $ver = & $python --version 2>&1
 Write-Log "Python: $ver"
 
-# Check Pillow
+# 2. Check / install Pillow
 Write-Log "Checking Pillow..."
-& $python -c "from PIL import Image" 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Write-Log "Installing Pillow..."
-    & $python -m pip install --quiet Pillow
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "[X] Pillow install failed."
-        & $python -m pip install Pillow
-        Read-Host "Press Enter to exit"; exit 1
+$pillowOk = $false
+try {
+    & $python -c "from PIL import Image" 2>$null
+    if ($LASTEXITCODE -eq 0) { $pillowOk = $true }
+} catch {}
+
+if (-not $pillowOk) {
+    $pillowOk = Install-Pillow -PythonExe $python
+    if (-not $pillowOk) {
+        Read-Host "Press Enter to exit"
+        return
     }
-    Write-Log "Pillow installed."
 } else {
     Write-Log "Pillow OK"
 }
 
-# Get image path
+# 3. Get image path
 if (-not $Image) {
     Write-Host ""
     Write-Host "Drag and drop an image file here, or type the path:"
@@ -126,7 +167,8 @@ if (-not $Image) {
     $Image = Read-Host "Image path"
     if (-not $Image) {
         Write-Host "No input. Exiting."
-        Read-Host "Press Enter to exit"; exit 1
+        Read-Host "Press Enter to exit"
+        return
     }
     $h = Read-Host "Max height per slice (default 5000)"
     if ($h) { $MaxHeight = [int]$h }
@@ -135,9 +177,10 @@ if (-not $Image) {
 # Strip quotes from drag-and-drop
 $Image = $Image.Trim('"').Trim("'")
 
-# Run
+# 4. Run slicer
 Write-Host ""
 & $python "$ScriptDir\slice.py" $Image --max-height $MaxHeight
+
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""
     Write-Host "[X] Error occurred."
