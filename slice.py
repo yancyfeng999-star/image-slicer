@@ -17,8 +17,35 @@ from pathlib import Path
 
 
 # ──────────────────────────────────────────────
+# Windows 编码修复
+# ──────────────────────────────────────────────
+
+def fix_windows_encoding():
+    """修复 Windows 控制台中文输出乱码"""
+    if sys.platform == "win32":
+        import io
+        # 强制 stdout/stderr 使用 UTF-8
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+        # 设置环境变量让子进程也用 UTF-8
+        os.environ["PYTHONIOENCODING"] = "utf-8"
+        # 尝试切换控制台代码页 (不影响外部)
+        try:
+            os.system("chcp 65001 >nul 2>&1")
+        except Exception:
+            pass
+
+
+fix_windows_encoding()
+
+
+# ──────────────────────────────────────────────
 # 环境检查 & 自动安装
 # ──────────────────────────────────────────────
+
+def log(msg):
+    print(f"[切图工具] {msg}")
+
 
 def ensure_pip():
     """确保 pip 可用，没有则尝试 bootstrap"""
@@ -26,13 +53,13 @@ def ensure_pip():
         import pip  # noqa: F401
         return True
     except ImportError:
-        print("[环境] 未检测到 pip，正在尝试自动安装...")
+        log("未检测到 pip，正在自动安装...")
         try:
             subprocess.check_call([sys.executable, "-m", "ensurepip", "--default-pip"])
-            print("[环境] pip 安装成功")
+            log("pip 安装成功")
             return True
         except Exception:
-            print("[环境] pip 安装失败，请手动安装: https://pip.pypa.io/en/stable/installation/")
+            print("pip 安装失败，请手动安装: https://pip.pypa.io/en/stable/installation/")
             return False
 
 
@@ -40,10 +67,10 @@ def ensure_pillow():
     """确保 Pillow 已安装"""
     try:
         from PIL import Image  # noqa: F401
-        print("[环境] Pillow ✓")
+        log("Pillow ✓")
         return True
     except ImportError:
-        print("[环境] 未检测到 Pillow，正在自动安装...")
+        log("未检测到 Pillow，正在自动安装...")
         if not ensure_pip():
             sys.exit(1)
         try:
@@ -51,30 +78,26 @@ def ensure_pillow():
                 sys.executable, "-m", "pip", "install",
                 "--quiet", "--disable-pip-version-check", "Pillow"
             ])
-            # 安装后验证 import
             import importlib
             importlib.invalidate_caches()
             from PIL import Image  # noqa: F401
-            print("[环境] Pillow 安装成功 ✓")
+            log("Pillow 安装成功 ✓")
             return True
         except subprocess.CalledProcessError:
-            print("[环境] Pillow 安装失败，请手动运行: pip install Pillow")
+            print("Pillow 安装失败，请手动运行: pip install Pillow")
             sys.exit(1)
         except ImportError:
-            print("[环境] Pillow 安装后仍无法导入，请重启终端后重试")
+            print("Pillow 安装后仍无法导入，请重启终端后重试")
             sys.exit(1)
 
 
 def check_environment():
     """完整环境检查"""
-    # 检查 Python 版本
     ver = sys.version_info
-    print(f"[环境] Python {ver.major}.{ver.minor}.{ver.micro}")
+    log(f"Python {ver.major}.{ver.minor}.{ver.micro}")
     if ver < (3, 6):
-        print("[环境] 需要 Python 3.6 或更高版本")
+        print("需要 Python 3.6 或更高版本")
         sys.exit(1)
-
-    # 检查 Pillow
     ensure_pillow()
 
 
@@ -113,7 +136,6 @@ def slice_image(image_path: str, max_height: int = 5000, output_dir: str = None)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     stem = image_path.stem
-    # 保持 PNG 输出，兼容性最好
     ext = ".png"
 
     # 计算切片

@@ -225,4 +225,5 @@ IMG="${IMG//\'/}"
 IMG="${IMG//\"/}"
 
 # 5. 运行切图
+export PYTHONIOENCODING=utf-8
 "$PYTHON" "$SCRIPT_DIR/slice.py" "$IMG" --max-height "$MAX_H"
