@@ -1,2 +1,2 @@
 @echo off
-powershell -NoExit -ExecutionPolicy Bypass -File "%~dp0run.ps1" %*
+start "" powershell -ExecutionPolicy Bypass -File "%~dp0run.ps1" %*

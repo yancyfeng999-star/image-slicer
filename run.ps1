@@ -7,6 +7,9 @@ param(
     [int]$MaxHeight = 5000
 )
 
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 function Log { param([string]$Msg) Write-Host "[*] $Msg" }
