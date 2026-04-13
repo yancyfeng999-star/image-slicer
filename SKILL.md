@@ -85,25 +85,25 @@ python3 slice.py <图片路径> [--max-height 5000] [--output-dir ./slices] [--s
 - 输出格式统一为 PNG
 - 支持输入: PNG / JPG / WebP / BMP / GIF
 
-## 运行效果
+## 输出 (全英文，无乱码)
 
 ```
-[切图工具] 启动
-[切图工具] 系统: macos | 包管理器: brew
-[切图工具] Python: /opt/homebrew/bin/python3 (Python 3.12.0) ✓
-[切图工具] Pillow ✓
+[*] Image Slicer starting...
+[*] System: macos | Package manager: brew
+[*] Python: /opt/homebrew/bin/python3 (Python 3.12.0)
+[*] Pillow OK
 
-图片: long_screenshot.png
-尺寸: 1080 x 18000
-格式: PNG
-将切割为 4 片，每片最大高度 5000px
+Image : long_screenshot.png
+Size  : 1080 x 18000
+Format: PNG
+Will split into 4 slices, max height 5000px each
 
-  [1/4] long_screenshot_001.png       top=     0px  bottom= 5000px  高度=5000px
-  [2/4] long_screenshot_002.png       top= 5000px  bottom=10000px  高度=5000px
-  [3/4] long_screenshot_003.png       top=10000px  bottom=15000px  高度=5000px
-  [4/4] long_screenshot_004.png       top=15000px  bottom=18000px  高度=3000px
+  [1/4] long_screenshot_001.png       top=     0  bottom= 5000  height=5000
+  [2/4] long_screenshot_002.png       top= 5000  bottom=10000  height=5000
+  [3/4] long_screenshot_003.png       top=10000  bottom=15000  height=5000
+  [4/4] long_screenshot_004.png       top=15000  bottom=18000  height=3000
 
-完成! 4 个切片已保存到: ./slices
+Done! 4 slices saved to: ./slices
 ```
 
 ## 故障排查

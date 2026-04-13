@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-切图工具 — 按高度每 N 像素从上往下纵向切割图片
-跨平台自检环境，自动安装依赖 (Python 3.6+)
+Image Slicer - Split long images vertically every N pixels.
+Cross-platform, auto-install dependencies (Python 3.6+).
 
-用法:
-  python3 slice.py <图片路径> [--max-height 5000] [--output-dir ./slices]
+Usage:
+  python3 slice.py <image> [--max-height 5000] [--output-dir ./slices]
 
-支持 macOS / Windows / Linux
+Supports macOS / Windows / Linux
 """
 
 import argparse
@@ -17,60 +17,33 @@ from pathlib import Path
 
 
 # ──────────────────────────────────────────────
-# Windows 编码修复
+# Environment check & auto-install
 # ──────────────────────────────────────────────
-
-def fix_windows_encoding():
-    """修复 Windows 控制台中文输出乱码"""
-    if sys.platform == "win32":
-        import io
-        # 强制 stdout/stderr 使用 UTF-8
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
-        # 设置环境变量让子进程也用 UTF-8
-        os.environ["PYTHONIOENCODING"] = "utf-8"
-        # 尝试切换控制台代码页 (不影响外部)
-        try:
-            os.system("chcp 65001 >nul 2>&1")
-        except Exception:
-            pass
-
-
-fix_windows_encoding()
-
-
-# ──────────────────────────────────────────────
-# 环境检查 & 自动安装
-# ──────────────────────────────────────────────
-
-def log(msg):
-    print(f"[切图工具] {msg}")
-
 
 def ensure_pip():
-    """确保 pip 可用，没有则尝试 bootstrap"""
+    """Ensure pip is available."""
     try:
         import pip  # noqa: F401
         return True
     except ImportError:
-        log("未检测到 pip，正在自动安装...")
+        print("[env] pip not found, installing...")
         try:
             subprocess.check_call([sys.executable, "-m", "ensurepip", "--default-pip"])
-            log("pip 安装成功")
+            print("[env] pip installed.")
             return True
         except Exception:
-            print("pip 安装失败，请手动安装: https://pip.pypa.io/en/stable/installation/")
+            print("[env] pip install failed. Install manually: https://pip.pypa.io/en/stable/installation/")
             return False
 
 
 def ensure_pillow():
-    """确保 Pillow 已安装"""
+    """Ensure Pillow is installed."""
     try:
         from PIL import Image  # noqa: F401
-        log("Pillow ✓")
+        print("[env] Pillow OK")
         return True
     except ImportError:
-        log("未检测到 Pillow，正在自动安装...")
+        print("[env] Pillow not found, installing...")
         if not ensure_pip():
             sys.exit(1)
         try:
@@ -81,28 +54,28 @@ def ensure_pillow():
             import importlib
             importlib.invalidate_caches()
             from PIL import Image  # noqa: F401
-            log("Pillow 安装成功 ✓")
+            print("[env] Pillow installed.")
             return True
         except subprocess.CalledProcessError:
-            print("Pillow 安装失败，请手动运行: pip install Pillow")
+            print("[env] Pillow install failed. Try: pip install Pillow")
             sys.exit(1)
         except ImportError:
-            print("Pillow 安装后仍无法导入，请重启终端后重试")
+            print("[env] Pillow installed but cannot import. Restart terminal and retry.")
             sys.exit(1)
 
 
 def check_environment():
-    """完整环境检查"""
+    """Full environment check."""
     ver = sys.version_info
-    log(f"Python {ver.major}.{ver.minor}.{ver.micro}")
+    print(f"[env] Python {ver.major}.{ver.minor}.{ver.micro}")
     if ver < (3, 6):
-        print("需要 Python 3.6 或更高版本")
+        print("[env] Need Python 3.6 or higher.")
         sys.exit(1)
     ensure_pillow()
 
 
 # ──────────────────────────────────────────────
-# 切图逻辑
+# Slice logic
 # ──────────────────────────────────────────────
 
 def slice_image(image_path: str, max_height: int = 5000, output_dir: str = None):
@@ -111,7 +84,7 @@ def slice_image(image_path: str, max_height: int = 5000, output_dir: str = None)
     image_path = Path(image_path).expanduser().resolve()
 
     if not image_path.exists():
-        print(f"错误: 文件不存在 — {image_path}")
+        print(f"[error] File not found: {image_path}")
         sys.exit(1)
 
     img = Image.open(image_path)
@@ -120,15 +93,15 @@ def slice_image(image_path: str, max_height: int = 5000, output_dir: str = None)
     if fmt == "JPG":
         fmt = "JPEG"
 
-    print(f"\n图片: {image_path.name}")
-    print(f"尺寸: {width} x {height}")
-    print(f"格式: {fmt}")
+    print(f"\nImage : {image_path.name}")
+    print(f"Size  : {width} x {height}")
+    print(f"Format: {fmt}")
 
     if height <= max_height:
-        print(f"图片高度 {height}px 未超过 {max_height}px，无需切割。")
+        print(f"Height {height}px <= {max_height}px, no need to slice.")
         return []
 
-    # 输出目录
+    # Output directory
     if output_dir is None:
         output_dir = image_path.parent / "slices"
     else:
@@ -138,9 +111,9 @@ def slice_image(image_path: str, max_height: int = 5000, output_dir: str = None)
     stem = image_path.stem
     ext = ".png"
 
-    # 计算切片
+    # Calculate slices
     total_slices = (height + max_height - 1) // max_height
-    print(f"将切割为 {total_slices} 片，每片最大高度 {max_height}px\n")
+    print(f"Will split into {total_slices} slices, max height {max_height}px each\n")
 
     slices = []
     for i in range(total_slices):
@@ -154,32 +127,32 @@ def slice_image(image_path: str, max_height: int = 5000, output_dir: str = None)
         cropped.save(out_path)
         slices.append(out_path)
         h = bottom - top
-        print(f"  [{i + 1}/{total_slices}] {out_name:30s}  top={top:>6d}px  bottom={bottom:>6d}px  高度={h}px")
+        print(f"  [{i + 1}/{total_slices}] {out_name:30s}  top={top:>6d}  bottom={bottom:>6d}  height={h}")
 
-    print(f"\n完成! {len(slices)} 个切片已保存到: {output_dir}")
+    print(f"\nDone! {len(slices)} slices saved to: {output_dir}")
     return slices
 
 
 # ──────────────────────────────────────────────
-# 入口
+# Entry point
 # ──────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(
-        description="切图工具 — 按高度纵向切割图片 (支持 macOS / Windows / Linux)"
+        description="Image Slicer - Split long images vertically (macOS / Windows / Linux)"
     )
-    parser.add_argument("image", help="要切割的图片路径")
+    parser.add_argument("image", help="Image file path")
     parser.add_argument(
         "--max-height", type=int, default=5000,
-        help="每片最大高度(px)，默认 5000"
+        help="Max height per slice in px (default: 5000)"
     )
     parser.add_argument(
         "--output-dir", default=None,
-        help="输出目录，默认: 图片同目录/slices"
+        help="Output directory (default: <image_dir>/slices)"
     )
     parser.add_argument(
         "--skip-check", action="store_true",
-        help="跳过环境检查 (已确认环境正常时使用)"
+        help="Skip environment check"
     )
     args = parser.parse_args()
 

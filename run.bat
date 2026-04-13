@@ -4,9 +4,9 @@ setlocal enabledelayedexpansion
 
 set "SCRIPT_DIR=%~dp0"
 
-REM ──────────────────────────────────────────
-REM Find Python
-REM ──────────────────────────────────────────
+REM =========================================
+REM  Find Python
+REM =========================================
 :find_python
 set "PYTHON="
 
@@ -40,9 +40,9 @@ if not defined PYTHON (
 )
 goto :eof
 
-REM ──────────────────────────────────────────
-REM Install Python
-REM ──────────────────────────────────────────
+REM =========================================
+REM  Install Python
+REM =========================================
 :install_python
 echo.
 echo [*] Python not found. Installing...
@@ -52,21 +52,21 @@ if %ERRORLEVEL% EQU 0 (
     echo [*] Installing via winget...
     winget install --id Python.Python.3.12 --accept-package-agreements --accept-source-agreements --silent
     if %ERRORLEVEL% EQU 0 (
-        echo [*] Python installed successfully.
+        echo [*] Python installed.
         goto :refresh_and_find
     ) else (
-        echo [*] winget failed, trying PowerShell download...
+        echo [*] winget failed, trying PowerShell...
     )
 )
 
-echo [*] Downloading Python installer...
+echo [*] Downloading Python...
 set "PY_INSTALLER=%TEMP%\python_installer.exe"
 
 powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.9/python-3.12.9-amd64.exe' -OutFile '%PY_INSTALLER%'" 2>nul
 
 if not exist "%PY_INSTALLER%" (
     echo.
-    echo [X] Auto download failed.
+    echo [X] Download failed.
     echo.
     echo Please install Python manually:
     echo   1. Open https://python.org/downloads
@@ -99,9 +99,9 @@ if not defined PYTHON (
 )
 goto :eof
 
-REM ──────────────────────────────────────────
-REM Install Pillow
-REM ──────────────────────────────────────────
+REM =========================================
+REM  Install Pillow
+REM =========================================
 :install_pillow
 echo [*] Installing Pillow...
 %PYTHON% -m pip install --quiet --disable-pip-version-check Pillow >nul 2>&1
@@ -116,9 +116,9 @@ if %ERRORLEVEL% NEQ 0 (
 echo [*] Pillow installed.
 goto :eof
 
-REM ══════════════════════════════════════════
+REM =========================================
 REM  Main
-REM ══════════════════════════════════════════
+REM =========================================
 
 REM 1. Find or install Python
 call :find_python
@@ -144,9 +144,6 @@ if %ERRORLEVEL% NEQ 0 (
 ) else (
     echo [*] Pillow OK
 )
-
-REM Ensure UTF-8 for all Python output
-set "PYTHONIOENCODING=utf-8"
 
 REM 3. Parse args
 set "IMG=%~1"
